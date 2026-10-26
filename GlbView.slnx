@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GlbView.Core/GlbView.Core.csproj" />
+    <Project Path="src/GlbView.Viewer/GlbView.Viewer.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GlbView.Core.Tests/GlbView.Core.Tests.csproj" />
+  </Folder>
+</Solution>
