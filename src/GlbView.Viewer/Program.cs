@@ -578,6 +578,10 @@ internal static class Program
     {
         var input = window.CreateInput();
 
+        // Last non-fullscreen state, so F11 restores exactly what the user had
+        // (maximized included) rather than always dropping to Normal.
+        var windowedState = window.WindowState;
+
         // Keyboard first and unconditionally: Esc is the only close path that works
         // without a pointer device, so it must not be behind the mouse guard.
         foreach (var keyboard in input.Keyboards)
@@ -589,6 +593,18 @@ internal static class Program
                     // Ask the render loop to paint a closing status first; window.Close()
                     // from here would skip straight to teardown.
                     requestClose();
+                }
+                else if (key == Key.F11)
+                {
+                    if (window.WindowState == WindowState.Fullscreen)
+                    {
+                        window.WindowState = windowedState;
+                    }
+                    else
+                    {
+                        windowedState = window.WindowState;
+                        window.WindowState = WindowState.Fullscreen;
+                    }
                 }
             };
         }
@@ -636,7 +652,8 @@ internal static class Program
 
             if (dragging)
             {
-                camera.Orbit(delta.X * 0.005f, delta.Y * 0.005f);
+                // Y is negated for the Exhibit-style convention: dragging up looks up.
+                camera.Orbit(delta.X * 0.005f, -delta.Y * 0.005f);
             }
             else if (panning)
             {
