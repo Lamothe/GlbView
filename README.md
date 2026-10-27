@@ -28,11 +28,12 @@ dotnet run --project src/GlbView.Viewer -- --inspect <model.glb>    # dump struc
 dotnet run --project src/GlbView.Viewer -- <model.glb> --capture out.png   # offscreen render
 ```
 
-Mouse: left-drag orbit, right/middle-drag pan, scroll zoom, Esc quits. The interactive
-viewer opens immediately and shows progress ("Parsing", "Uploading textures n/N",
-"Closing") via a small built-in bitmap-font overlay: parsing and texture decoding run
-on a background thread, and textures upload incrementally per frame. Exit codes: 0 on
-clean close, 2 if the model failed to load.
+Mouse: left-drag orbit, right/middle-drag pan, scroll zoom, F11 toggles fullscreen,
+Esc quits. The interactive viewer opens immediately and shows progress ("Parsing",
+"Uploading textures n/N", "Closing") via an antialiased TrueType status overlay
+(rasterised from a system sans face; a small bitmap font is the last-resort fallback):
+parsing and texture decoding run on a background thread, and textures upload
+incrementally per frame. Exit codes: 0 on clean close, 2 if the model failed to load.
 
 Diagnostic env vars: `GLBVIEW_WIREFRAME=1` (no culling/depth), `GLBVIEW_SOLID=1|2`
 (solid-colour shaders; mode 2 ignores vertex attributes entirely), `GLBVIEW_AUTO_CLOSE_MS=N`

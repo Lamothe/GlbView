@@ -6,6 +6,10 @@ namespace GlbView.Viewer;
 /// </summary>
 internal static class BitmapFont
 {
+    public const int GlyphWidth = 5;
+    public const int GlyphHeight = 7;
+    public const int Advance = 6; // 5 px glyph + 1 px gap
+
     private static readonly string[] Blank = { ".....", ".....", ".....", ".....", ".....", ".....", "....." };
 
     private static readonly Dictionary<char, string[]> Glyphs = new()

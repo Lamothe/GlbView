@@ -240,7 +240,7 @@ internal static class Program
                 var tw = window.FramebufferSize.X;
                 var th = window.FramebufferSize.Y;
                 using var overlay = new StatusOverlay(gl);
-                overlay.DrawStatus(tw, th, "CLOSING", "RELEASING RESOURCES", -1f, 1.25f);
+                overlay.DrawStatus(tw, th, "Closing", "Releasing resources", -1f, 1.25f);
             }
             else
             {
@@ -426,7 +426,7 @@ internal static class Program
                 gl.Viewport(0, 0, (uint)width, (uint)height);
                 gl.ClearColor(0.12f, 0.08f, 0.10f, 1f);
                 gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-                overlay.DrawStatus(width, height, "LOAD FAILED", Truncate(loadError, 68), 0f, elapsed);
+                overlay.DrawStatus(width, height, "Load failed", Truncate(loadError, 68), 0f, elapsed);
                 return;
             }
 
@@ -435,7 +435,7 @@ internal static class Program
                 gl.Viewport(0, 0, (uint)width, (uint)height);
                 gl.ClearColor(0.10f, 0.11f, 0.13f, 1f);
                 gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-                overlay.DrawStatus(width, height, "CLOSING", "RELEASING RESOURCES", -1f, elapsed);
+                overlay.DrawStatus(width, height, "Closing", "Releasing resources", -1f, elapsed);
                 if (closingPainted)
                 {
                     // Second pass: the status frame has been presented; tear down now,
@@ -486,13 +486,13 @@ internal static class Program
                         // Count failed decodes as processed: they never reach the queue,
                         // so the label would otherwise stall short of the total.
                         var handled = uploadDone + Volatile.Read(ref decodeFailed);
-                        overlay.DrawStatus(width, height, "LOADING",
-                            $"UPLOADING TEXTURES {Math.Min(handled, textureTotal)}/{textureTotal}",
+                        overlay.DrawStatus(width, height, "Loading",
+                            $"Uploading textures {Math.Min(handled, textureTotal)}/{textureTotal}",
                             (float)handled / textureTotal, elapsed);
                     }
                     else
                     {
-                        overlay.DrawStatus(width, height, "LOADING", "PREPARING", 1f, elapsed);
+                        overlay.DrawStatus(width, height, "Loading", "Preparing", 1f, elapsed);
                     }
 
                     // Ready once the task has finished and the queue is fully drained
@@ -504,7 +504,7 @@ internal static class Program
                 }
                 else
                 {
-                    overlay.DrawStatus(width, height, "LOADING", "PARSING MODEL", -1f, elapsed);
+                    overlay.DrawStatus(width, height, "Loading", "Parsing model", -1f, elapsed);
                 }
 
                 return;
@@ -571,7 +571,7 @@ internal static class Program
             return string.Empty;
         }
 
-        return text.Length <= max ? text : text[..(max - 1)] + "…";
+        return text.Length <= max ? text : text[..(max - 3)] + "...";
     }
 
     private static void HookInput(IWindow window, OrbitCamera camera, Action requestClose)
