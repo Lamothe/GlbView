@@ -159,6 +159,16 @@ internal static class ShaderSources
 
         const float PI = 3.141592653589793;
 
+        /// Exact inverse of the GPU's GL_SRGB8_ALPHA8 decode (piecewise), so a texture
+        /// that round-trips through upload and output lands back on its authored value.
+        vec3 linearToSrgb(vec3 c)
+        {
+            c = max(c, 0.0);
+            vec3 lo = c * 12.92;
+            vec3 hi = 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055;
+            return mix(hi, lo, lessThanEqual(c, vec3(0.0031308)));
+        }
+
         vec2 uvFor(int set, mat3 transform)
         {
             return (transform * vec3(set == 1 ? vTexCoord1 : vTexCoord0, 1.0)).xy;
@@ -227,7 +237,12 @@ internal static class ShaderSources
 
             if (uUnlit)
             {
-                FragColor = vec4(base.rgb + emissive, base.a);
+                // Unlit displays the base colour as authored: the sampled sRGB texture is
+                // linear here, so encode it back out rather than lighting it. Emissive is
+                // additive and allowed above 1 — the encode passes HDR values through the
+                // piecewise curve without pre-clipping.
+                vec3 authored = linearToSrgb(base.rgb + emissive);
+                FragColor = vec4(authored, base.a);
                 return;
             }
 
@@ -307,7 +322,9 @@ internal static class ShaderSources
             float sheenRough = uSheenRoughnessFactor;
             if (uHasSheenRoughnessTex != 0)
             {
-                sheenRough *= texture(uSheenRoughnessTex, uvFor(uSheenRoughnessSet, uSheenRoughnessUv)).r;
+                // KHR_materials_sheen: roughness lives in the alpha channel (the one
+                // glTF roughness slot that is not green).
+                sheenRough *= texture(uSheenRoughnessTex, uvFor(uSheenRoughnessSet, uSheenRoughnessUv)).a;
             }
 
             vec3 color = vec3(0.0);
@@ -409,7 +426,7 @@ internal static class ShaderSources
 
             // ACES-ish tone mapping keeps bright emissives and speculars from clipping.
             color = (color * (2.51 * color + 0.03)) / (color * (2.43 * color + 0.59) + 0.14);
-            color = pow(clamp(color, 0.0, 1.0), vec3(1.0 / 2.2));
+            color = linearToSrgb(color);
 
             FragColor = vec4(color, base.a);
         }

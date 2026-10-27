@@ -40,6 +40,13 @@ Diagnostic env vars: `GLBVIEW_WIREFRAME=1` (no culling/depth), `GLBVIEW_SOLID=1|
 `GLBVIEW_STATUS_TEST=1` (with `--capture`: draws the status overlay after the model to
 verify overlay text survives the renderer's GL state).
 
+## Desktop integration (GNOME)
+
+`linux/install.sh` publishes the viewer to `~/.local/share/glbview`, installs a
+`.desktop` entry and icon, and makes GlbView the default handler for `.glb`/`.gltf`
+(double-click in Files). Launching GlbView with no arguments opens a file picker.
+Re-run the script after pulling changes; it is idempotent.
+
 ## Extension support
 
 The corpus this was built for uses extensions VTK's importer either refuses or silently

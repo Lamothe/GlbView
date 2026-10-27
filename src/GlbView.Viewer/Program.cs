@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Numerics;
 using GlbView.Core;
 using Silk.NET.Input;
@@ -15,10 +16,16 @@ internal static class Program
     {
         if (args.Length == 0)
         {
-            Console.WriteLine("usage: GlbView.Viewer <model.glb|model.gltf> [--inspect]");
-            Console.WriteLine("       GlbView.Viewer --inspect <model.glb>");
-            Console.WriteLine("       GlbView.Viewer <model.glb> --capture out.png [--frames N]");
-            return;
+            // Desktop launchers pass no arguments: offer a file picker so the app is
+            // useful from the GNOME application grid, then fall back to usage text.
+            var picked = TryPickModelFile();
+            if (picked is null)
+            {
+                PrintUsage();
+                return;
+            }
+
+            args = [picked];
         }
 
         var inspect = args.Contains("--inspect");
@@ -103,6 +110,58 @@ internal static class Program
     {
         var i = Array.IndexOf(args, name);
         return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+    }
+
+    private static void PrintUsage()
+    {
+        Console.WriteLine("usage: GlbView.Viewer <model.glb|model.gltf> [--inspect]");
+        Console.WriteLine("       GlbView.Viewer --inspect <model.glb>");
+        Console.WriteLine("       GlbView.Viewer <model.glb> --capture out.png [--frames N]");
+    }
+
+    /// <summary>
+    /// File picker for the no-argument desktop launcher case, via zenity's
+    /// GtkFileChooser dialog. Returns null (and lets the caller print usage) when
+    /// zenity is missing, the user cancels, or no display is available.
+    /// </summary>
+    private static string? TryPickModelFile()
+    {
+        if (Environment.GetEnvironmentVariable("DISPLAY") is null
+            && Environment.GetEnvironmentVariable("WAYLAND_DISPLAY") is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "zenity",
+                UseShellExecute = false,
+                // Stderr inherits the terminal. Redirecting it without draining would
+                // deadlock if zenity ever wrote more than a pipe buffer of warnings.
+                RedirectStandardOutput = true,
+            };
+            psi.ArgumentList.Add("--file-selection");
+            psi.ArgumentList.Add("--title=Open a glTF model");
+            psi.ArgumentList.Add("--file-filter=glTF models | *.glb *.gltf *.GLB *.GLTF");
+            psi.ArgumentList.Add("--file-filter=All files | *");
+
+            using var proc = Process.Start(psi);
+            if (proc is null)
+            {
+                return null;
+            }
+
+            // Trim only the trailing newline: filenames may legally contain spaces.
+            var path = proc.StandardOutput.ReadToEnd().TrimEnd('\r', '\n');
+            proc.WaitForExit();
+            return proc.ExitCode == 0 && path.Length > 0 ? path : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     private static bool IsOptionValue(string[] args, string value, params string[] valueOptions)

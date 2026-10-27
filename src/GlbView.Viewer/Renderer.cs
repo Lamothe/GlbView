@@ -19,7 +19,9 @@ internal sealed unsafe class Renderer : IDisposable
     private readonly uint _program;
 
     private readonly int[] _textureIds;
+    private readonly HashSet<int> _srgbTextures;
     private readonly List<GlPrimitive> _primitives = new();
+    private readonly List<GlPrimitive> _ordered = new();
     private bool _disposed;
     private readonly Dictionary<string, int> _materialUniformCache = new();
 
@@ -33,6 +35,8 @@ internal sealed unsafe class Renderer : IDisposable
         public int IndexCount;
         public int MaterialIndex;
         public Matrix4x4 World;
+        public Vector3 Centre;
+        public int Seq;
         public bool DoubleSided;
         public AlphaMode AlphaMode;
     }
@@ -44,6 +48,12 @@ internal sealed unsafe class Renderer : IDisposable
         _program = BuildProgram();
         _textureIds = new int[model.Textures.Count];
         Array.Fill(_textureIds, -1);
+        _srgbTextures = TextureColorSpace.SrgbTextureIndices(model.Materials);
+        foreach (var shared in TextureColorSpace.SharedUsage(model.Materials))
+        {
+            Console.Error.WriteLine(
+                $"warning: texture {shared} is used as both colour and data; uploading sRGB (data reads will be decoded).");
+        }
 
         UploadGeometry();
         if (decodedTextures is not null)
@@ -188,9 +198,13 @@ internal sealed unsafe class Renderer : IDisposable
         var tex = _model.Textures[index];
         var id = _gl.GenTexture();
         _gl.BindTexture(TextureTarget.Texture2D, id);
+        // Colour textures are sRGB-encoded in the file; sampling from an sRGB internal
+        // format decodes them to linear so lighting runs in linear space and the output
+        // encode is the only gamma step. Data textures stay plain linear RGBA.
+        var format = _srgbTextures.Contains(index) ? InternalFormat.Srgb8Alpha8 : InternalFormat.Rgba8;
         fixed (byte* p = image.Data)
         {
-            _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8,
+            _gl.TexImage2D(TextureTarget.Texture2D, 0, format,
                 (uint)image.Width, (uint)image.Height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, p);
         }
 
@@ -280,6 +294,8 @@ internal sealed unsafe class Renderer : IDisposable
                 var vertexCount = prim.Positions.Length;
                 var stride = 18 * sizeof(float);
                 var data = new float[vertexCount * 18];
+                var primMin = new Vector3(float.MaxValue);
+                var primMax = new Vector3(float.MinValue);
                 for (var i = 0; i < vertexCount; i++)
                 {
                     var rawPosition = prim.Positions[i];
@@ -354,6 +370,8 @@ internal sealed unsafe class Renderer : IDisposable
 
                     min = Vector3.Min(min, worldPosition);
                     max = Vector3.Max(max, worldPosition);
+                    primMin = Vector3.Min(primMin, worldPosition);
+                    primMax = Vector3.Max(primMax, worldPosition);
                     any = true;
                 }
 
@@ -396,6 +414,10 @@ internal sealed unsafe class Renderer : IDisposable
                     IndexCount = indices.Length,
                     MaterialIndex = matIndex,
                     World = world,
+                    // World-space centre for the per-frame translucent sort. Skinned
+                    // vertices are baked to world at identity, so bounds already match.
+                    Centre = (primMin + primMax) * 0.5f,
+                    Seq = _primitives.Count,
                     DoubleSided = matIndex >= 0 && _model.Materials[matIndex].DoubleSided,
                     // MASK is shader-side discard and belongs in the opaque pass;
                     // only BLEND needs the second pass.
@@ -485,8 +507,18 @@ internal sealed unsafe class Renderer : IDisposable
         _gl.DepthMask(true);
         _gl.Disable(EnableCap.Blend);
 
-        // Opaque + masked first (depth writes on), then blended back-to-front with
-        // depth writes off — the standard minimal translucency policy.
+        // Opaque + masked first (depth writes on). Blended primitives then draw
+        // farthest-centre-first — straight-alpha compositing is order-dependent, and
+        // an unsorted pass lets near shells (hair caps) paint over far wisps. This is
+        // a per-primitive approximation: triangles within one draw call stay in index
+        // order, and a large shell can still overtake small cards near its centre.
+        // Exact ordering needs per-triangle sorting or order-independent translucency.
+        if (_ordered.Count != _primitives.Count)
+        {
+            _ordered.Clear();
+            _ordered.AddRange(_primitives);
+        }
+
         foreach (var pass in new[] { AlphaMode.Opaque, AlphaMode.Blend })
         {
             if (pass == AlphaMode.Blend)
@@ -494,9 +526,15 @@ internal sealed unsafe class Renderer : IDisposable
                 _gl.Enable(EnableCap.Blend);
                 _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
                 _gl.DepthMask(false);
+                _ordered.Sort((a, b) =>
+                {
+                    var cmp = Vector3.DistanceSquared(b.Centre, camera.Position).CompareTo(
+                        Vector3.DistanceSquared(a.Centre, camera.Position));
+                    return cmp != 0 ? cmp : a.Seq.CompareTo(b.Seq);
+                });
             }
 
-            foreach (var prim in _primitives)
+            foreach (var prim in pass == AlphaMode.Blend ? _ordered : _primitives)
             {
                 if (prim.AlphaMode != pass)
                 {

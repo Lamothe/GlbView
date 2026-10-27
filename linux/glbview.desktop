@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=GlbView
+Comment=View glTF and GLB 3D models
+Exec="@BINDIR@/GlbView.Viewer" %f
+Icon=glbview
+Terminal=false
+Type=Application
+Categories=Graphics;3DGraphics;Viewer;
+MimeType=model/gltf-binary;model/gltf+json;
+StartupNotify=true
